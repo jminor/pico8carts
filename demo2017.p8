@@ -4,6 +4,7 @@ __lua__
 function _init()
  t=0
  q=0
+ cht=0
  fns={static2,static,tartan,f1,f2,f3,melt}
  ch=0
  cls()
@@ -17,10 +18,12 @@ end
 
 function _update60()
  t=t+1
+ cht=cht+1
  q=q+30
- if btnp(5) then
+ if btnp(5) or cht>60 then
   rot(fns)
   ch=(ch+1)%#fns
+  cht=0
  end
 end
 
