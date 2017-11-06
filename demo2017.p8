@@ -5,10 +5,34 @@ function _init()
  t=0
  q=0
  cht=0
- fns={monostat,stars1,static,tartan,stars2,f1,stars4,f2,stars3,f3,melt}
+ fns={monostat,stars1,static,tartan,stars2,f1,stars4,f2,stars3,f3,melt,theend}
+ msg="pico-8 ftw! 2k cart - greetz: steinbach, whorfin, jcowles, raspberryopal, rgb"
  ch=0
  addch(0)
  cls()
+end
+
+function theend()
+ cls()
+ local bs={6,10,12,11,14,8,1}
+ for i=1,7 do
+  rectfill((i-1)*128/7,0,i*128/7,80,bs[i])
+ end
+ local bs={1,0,14,0,12,0,6}
+ for i=1,7 do
+  rectfill((i-1)*128/7,80,i*128/7,100,bs[i])
+ end
+ local bs={1,7,2}
+ for i=1,3 do
+  rectfill((i-1)*128/5,101,i*128/5,127,bs[i])
+ end
+ local bs={1,0,5}
+ for i=1,3 do
+  rectfill(i*7+90,101,i*7+97,127,bs[i])
+ end
+ txt("pico-tv",64-7*2,56)
+ txt("off air",64-7*2,64)
+ txt(msg,128-cht%(#msg*4+128),110)
 end
 
 function rand(low,high)
@@ -35,8 +59,13 @@ function _update60()
  t=t+1
  cht=cht+1
  q=q+30
- if btnp(5) or cht>60*5 then
+ if btnp(5) then
   addch(1)
+ end
+ if cht>60*3 then
+  if ch<#fns-1 then
+   addch(1)
+  end
  end
 end
 
