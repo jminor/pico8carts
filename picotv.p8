@@ -1,6 +1,9 @@
 pico-8 cartridge // http://www.pico-8.com
 version 12
 __lua__
+-- pico-tv by jminor 2017
+-- music by zep
+
 function _init()
  t=0
  q=0
