@@ -10,7 +10,7 @@ function _init()
  p1={x=1, y=64, w=2, h=20, score=0}
  p2={x=124, y=64, w=2, h=20, score=0}
  b={x=64, y=32+rnd(64), w=2, h=2,
-    vx=1, vy=0}
+    vx=1, vy=1}
 end
 
 function reset()
