@@ -77,7 +77,7 @@ function _init()
   end
 end
 
-function _update()
+function _update60()
  if gameover then
   if (btnp(4,0) or btnp(5,0) or
       btnp(4,1) or btnp(5,1)) then
