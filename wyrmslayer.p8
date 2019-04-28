@@ -10,12 +10,13 @@ __lua__
 -- make it fun
 -- graphics
 
-dirs={
- {x=-1,y=0},
- {x= 1,y=0},
- {x=0,y=-1},
- {x=0,y= 1},
-}
+--dirs={
+-- vec2(-1, 0),
+-- vec2(-1, 0),
+-- vec2( 1, 0),
+-- vec2( 0,-1),
+-- vec2( 0, 1)
+--}
 
 gravity=1
 
@@ -30,10 +31,8 @@ function _init()
   --pl.c=8-i
   pl.enabled=false
   pl.spd+=0.1*i
-  pl.w=6
-  pl.h=6
-  pl.ox=-1
-  pl.oy=-2
+  pl.sz=vec2(6,6)
+  pl.off=vec2(-1,-2)
   add(actors,pl)
   add(players,pl)
  end
@@ -57,15 +56,15 @@ function _update60()
  cls()
  map()
  -- controls
- local cx,cy,cj=0,0,false
- if (btn(0)) cx-=1
- if (btn(1)) cx+=1
- if (btn(2)) cy-=1
- if (btn(3)) cy+=1
+ local c,cj=vec2(0,0),false
+ if (btn(0)) c.x-=1
+ if (btn(1)) c.x+=1
+ if (btn(2)) c.y-=1
+ if (btn(3)) c.y+=1
  if (btnp(4)) cj=true
 
  update_sliders()
- update_players(cx,cy,cj)
+ update_players(c,cj)
  
  for p in all(players) do
   p:draw()
@@ -75,36 +74,36 @@ function _update60()
  end
 end
 
-function update_players(cx,cy,cj)
+function update_players(c,cj)
  for p in all(players) do
-  p.cx=cx
+  p.ctl.x=c.x
   if p.canfly then
-   p.cy=cj and -20 or 0
-   p.vx*=0.9
+   p.ctl.y=cj and -20 or 0
+   p.vel.x*=0.9
    -- limit vy
-   p.vy=mid(p.vy,2,-2)
+   p.vel.y=mid(p.vel.y,2,-2)
   else
    -- going up => not standing
-   if p.vy>=0 and p:standing() then
-    -- vy=0 is key to a
+   if p.vel.y>=0 and p:standing() then
+    -- vel.y=0 is key to a
     -- consistent jump
-    p.vy=0
-    p.cy=cj and -20 or 0
-    p.vx*=0.8
+    p.vel.y=0
+    p.ctl.y=cj and -20 or 0
+    p.vel.x*=0.8
    else
-    p.cy=0
-    p.vx*=0.9
+    p.ctl.y=0
+    p.vel.x*=0.9
    end
   end
   p:accel(
-   p.cx*p.spd,
-   p.cy*p.spd + gravity
+   p.ctl.x*p.spd,
+   p.ctl.y*p.spd + gravity
   )
-  p:movex(p.vx, function()
-   p.vx=0
+  p:move(1,p.vel.x, function()
+   p.vel.x=0
   end)
-  p:movey(p.vy, function()
-   p.vy=0
+  p:move(2,p.vel.y, function()
+   p.vel.y=0
   end)
 --  print("x="..p.x,p.c)
 --  print("y="..p.y)
@@ -121,56 +120,56 @@ function update_sliders()
   local bouncex,bouncey=false,false
   local rider=""
 
-  local mx=sl:movex(sl.vx, function()
+  local mx=sl:move(1,sl.vel.x, function()
    bouncex=true
   end)
 --  assert(mx==0 or mx==1 or mx==-1)
   if mx~=0 then
    sl.collides=false
    for a in all(actors) do
-    if a:overlap_spr(a.x,a.y,sl) then
+    if a:overlap_spr(a.pos.x,a.pos.y,sl) then
      while (
       not a.squished and
-      a:overlap_spr(a.x,a.y,sl)
+      a:overlap_spr(a.pos.x,a.pos.y,sl)
      ) do
-      a:movex(sgn(mx), function()
+      a:move(1,sgn(mx), function()
        a:squish()
       end)
      end
     elseif find(riders,a) then
      rider=rider.."x+"..mx
-     a:movex(mx)
+     a:move(1,mx)
     end
    end
    sl.collides=true
   end
 
-  local my=sl:movey(sl.vy, function()
+  local my=sl:move(2,sl.vel.y, function()
    bouncey=true
   end)
 --  assert(my==0 or my==-1 or my==1)
   if my~=0 then
    sl.collides=false
    for a in all(actors) do
-    if a:overlap_spr(a.x,a.y,sl) then
+    if a:overlap_spr(a.pos.x,a.pos.y,sl) then
      while (
       not a.squished and
-      a:overlap_spr(a.x,a.y,sl)
+      a:overlap_spr(a.pos.x,a.pos.y,sl)
      ) do
-      a:movey(sgn(my), function()
+      a:move(2,sgn(my), function()
        a:squish()
       end)
      end
     elseif find(riders,a) then
      rider=rider.." y+"..my
-     a:movey(my)
+     a:move(2,my)
     end
    end
    sl.collides=true
   end
 
-  if (bouncex) sl.vx*=-1
-  if (bouncey) sl.vy*=-1
+  if (bouncex) sl.vel.x*=-1
+  if (bouncey) sl.vel.y*=-1
 
 --  if sl==sliders[1] then
 --  color(7)
@@ -200,9 +199,12 @@ function sprite.new(name, tile)
  	ts={tile},
  	enabled=true,
  	c=nil, -- color
- 	-- pos, size, vel, rem, offset
-  x=0, w=8, vx=0, rx=0, ox=0,
-  y=0, h=8, vy=0, ry=0, oy=0,
+ 	ctl=vec2(0,0),
+ 	pos=vec2(0,0),
+ 	sz=vec2(8,8),
+ 	vel=vec2(0,0),
+ 	rem=vec2(0,0),
+ 	off=vec2(0,0),
   spd=1, -- speed
   collides_actors=true,
   collides_solids=true,
@@ -217,14 +219,15 @@ end
 function sprite.draw(self)
  if not self.enabled then return end
  if self.t~=nil or self.ts~=nil then
-  if self.w>8 or self.h>8 then
+  local p=self.pos+self.off
+  if self.sz.x>8 or self.sz.y>8 then
    local ti=1
-   for tx=0,ceil(self.w/8)-1 do
-    for ty=0,ceil(self.h/8)-1 do
+   for tx=0,ceil(self.sz.x/8)-1 do
+    for ty=0,ceil(self.sz.y/8)-1 do
      spr(
       self.ts[ti],
-      self.x+tx*8 + self.ox,
-      self.y+ty*8 + self.oy
+      p.x+tx*8,
+      p.y+ty*8
      )
      ti=(ti%#self.ts)
     end
@@ -232,57 +235,39 @@ function sprite.draw(self)
   else
    spr(
     self.t,
-    self.x + self.ox,
-    self.y + self.oy
+    p.x,
+    p.y
    )
   end
  end
  -- border
  if self.c~=nil then
   rect(
-   self.x,
-   self.y,
-   self.x+self.w-1,
-   self.y+self.h-1,
+   self.pos.x,
+   self.pos.y,
+   self.pos.x+self.sz.x-1,
+   self.pos.y+self.sz.y-1,
    self.c
   )
  end
 end
 
-function sprite:movex(dx,cb,flag)
+function sprite:move(axis,delta,cb,flag)
  if not self.enabled then return end
- if (dx==0) return 0
- local step=sgn(dx)
- self.rx+=dx
- local move=int(self.rx)
+ if (delta==0) return 0
+ local step=sgn(delta)
+ self.rem[axis]+=delta
+ local move=int(self.rem[axis])
  local moved=0
- self.rx-=move
+ self.rem[axis]-=move
  while move!=0 do
-  if self:overlap(self.x+step,self.y,flag) then
+  local p=vec2(self.pos.x,self.pos.y)
+  p[axis]+=step
+  if self:overlap(p.x,p.y,flag) then
    if (cb) cb()
    break
   end
-  self.x+=step
-  moved+=step
-  move-=step
- end
- return moved
-end
-
-function sprite:movey(dy,cb,flag)
- if not self.enabled then return end
- if (dy==0) return 0
- local step=sgn(dy)
- self.ry+=dy
- local move=int(self.ry)
- local moved=0
- self.ry-=move
- while move!=0 do
-  if self:overlap(self.x,self.y+step,flag) then
-   if (cb) cb()
-   break
-  end
-  self.y+=step
+  self.pos[axis]+=step
   moved+=step
   move-=step
  end
@@ -291,8 +276,8 @@ end
 
 function sprite:accel(ax,ay)
  local dt=0.1
- self.vx+=ax*dt
- self.vy+=ay*dt
+ self.vel.x+=ax*dt
+ self.vel.y+=ay*dt
 end
 
 function sprite:overlap(x,y,flag)
@@ -315,27 +300,27 @@ function sprite:overlap(x,y,flag)
   -- check the corners vs map
   return map_overlap(
    self.collides_map,
-   x,y,self.w,self.h,
+   x,y,self.sz.x,self.sz.y,
    self.collides_map_exclude)
  end
  return false
 end
 
 function sprite:overlap_spr(x,y,a)
- return (x < a.x+a.w) and
-  (y < a.y+a.h) and
-  (x+self.w > a.x) and
-  (y+self.h > a.y)
+ return (x < a.pos.x+a.sz.x) and
+  (y < a.pos.y+a.sz.y) and
+  (x+self.sz.x > a.pos.x) and
+  (y+self.sz.y > a.pos.y)
 end
 
 function sprite:standing()
- return self:overlap(self.x,self.y+1)
+ return self:overlap(self.pos.x,self.pos.y+1)
 end
 
 function sprite:riders()
  local t={}
  for a in all(actors) do
-  if a.enabled and a:overlap_spr(a.x,a.y+1,self) then
+  if a.enabled and a:overlap_spr(a.pos.x,a.pos.y+1,self) then
    add(t,a)
   end
  end
@@ -367,8 +352,8 @@ function init_map()
     local pl=players[t]
     if pl then
      pl.enabled=true
-     pl.x=x*8
-     pl.y=y*8
+     pl.pos.x=x*8
+     pl.pos.y=y*8
     end
     mset(x,y,0)
    end
@@ -383,10 +368,10 @@ function init_map()
    if f==f_slider then
     local sl=sprite.new("sl"..si,t)
     si+=1
-    sl.x=x*8
-    sl.y=y*8
-    sl.vx=t==32 and 1/4 or 0
-    sl.vy=t==48 and 1/4 or 0
+    sl.pos.x=x*8
+    sl.pos.y=y*8
+    sl.vel.x=t==32 and 1/4 or 0
+    sl.vel.y=t==48 and 1/4 or 0
     sl.collides_actors=false
     sl.collides_solids=false
     sl.collides_map=f_track
@@ -395,7 +380,7 @@ function init_map()
     add(solids,sl)
     mset(x,y,t+1)
     -- look for wide platforms
-    for x2=ceil(x+sl.w/8),15 do
+    for x2=ceil(x+sl.sz.x/8),15 do
      local t2=mget(x2,y)
      if fget(t2)!=f_slider then break end
      -- add the tile to .ts
@@ -403,7 +388,7 @@ function init_map()
      -- replace with a track
      mset(x2,y,t2+1)
      -- make sl wider
-     sl.w+=8
+     sl.sz.x+=8
      x2+=1
     end
    end
@@ -463,6 +448,57 @@ function _test_find()
  assert(find({a,b},{1})==nil)
 end
 _test_find()
+
+vec2={}
+setmetatable(vec2,vec2)
+
+function vec2.__index(t,k)
+ if k=="x" or k==1 then return t[1] end
+ if k=="y" or k==2 then return t[2] end
+ return vec2[k]
+end
+
+function vec2.__newindex(t,k,v)
+ if k=="x" then t[1]=v end
+ if k=="y" then t[2]=v end
+ rawset(t,k,v)
+end
+
+function vec2:__call(x,y)
+ local v={x,y}
+ setmetatable(v,vec2)
+ return v
+end
+
+function vec2.__add(a,b)
+ return vec2(a.x+b.x,a.y+b.y)
+end
+
+function vec2.__sub(a,b)
+ return vec2(a.x-b.x,a.y-b.y)
+end
+
+function vec2.__eq(a,b)
+ return a.x==b.x and a.y==b.y
+end
+
+function _test_vec2()
+ local v1=vec2(1,2)
+ local v2=vec2(3,9)
+ local v3=vec2(4,11)
+ assert(v1.x==1)
+ assert(v1.y==2)
+ assert(v1+v2==v3)
+ assert(v3-v2==v1)
+ v1.x+=9
+ assert(v1.x==10)
+end
+
+_test_vec2()
+
+-- before 1574
+-- vec2 1773
+-- after 1767
 
 __gfx__
 000000000a0000a09999999988888888000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
