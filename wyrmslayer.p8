@@ -5,7 +5,9 @@ __lua__
 
 -- todo:
 -- flapping affect vx?
--- moving platforms
+-- wide moving platforms
+-- diagonal moving platforms
+-- circular moving platforms
 -- make it fun
 -- graphics
 
@@ -24,9 +26,9 @@ function _init()
  players={}
  sliders={}
 
- for i=1,3 do
-  local pl=sprite.new(nil)
-  pl.c=11-i
+ for i=3,3 do
+  local pl=sprite.new("pl"..i,nil)
+  pl.c=8-i
   pl.spd+=0.1*i
   pl.w=i*2
   pl.h=i*5
@@ -35,8 +37,10 @@ function _init()
   add(actors,pl)
   add(players,pl)
  end
- players[2].canfly=true
-
+ if players[2] then
+	 players[2].canfly=true
+ end
+ 
  init_map()
 
 end
@@ -52,6 +56,19 @@ function _update60()
  if (btn(2)) cy-=1
  if (btn(3)) cy+=1
  if (btnp(4)) cj=true
+
+ update_sliders()
+ update_players(cx,cy,cj)
+ 
+ for p in all(players) do
+  p:draw()
+ end
+ for sl in all(sliders) do
+  sl:draw()
+ end
+end
+
+function update_players(cx,cy,cj)
  for p in all(players) do
   p.cx=cx
   if p.canfly then
@@ -82,7 +99,6 @@ function _update60()
   p:movey(p.vy, function()
    p.vy=0
   end)
-  p:draw()
 --  print("x="..p.x,p.c)
 --  print("y="..p.y)
 --  print("cx="..p.cx)
@@ -90,72 +106,78 @@ function _update60()
 --  print("vx="..p.vx)
 --  print("vy="..p.vy)
  end
- 
+end
+
+function update_sliders()
  for sl in all(sliders) do
   local riders=sl:riders()
   local bounce=false
   local rider=""
+
   local mx=sl:movex(sl.vx, function()
    bounce=true
   end)
-  sl.collides=false
-  for a in all(actors) do
-   if a:overlap_spr(a.x,a.y,sl) then
-    local dx=0
-    if mx>0 then
-     dx = (sl.x+sl.w)-a.x+1
-    else
-     dx = sl.x-(a.x+a.w)-1
+--  assert(mx==0 or mx==1 or mx==-1)
+  if mx~=0 then
+   sl.collides=false
+   for a in all(actors) do
+    if a:overlap_spr(a.x,a.y,sl) then
+     while (
+      not a.squished and
+      a:overlap_spr(a.x,a.y,sl)
+     ) do
+      a:movex(sgn(mx), function()
+       a:squish()
+      end)
+     end
+    elseif find(riders,a) then
+     rider=rider.."x+"..mx
+     a:movex(mx)
     end
-    a:movex(dx, function()
-     a:squish()
-    end)
-    print("dx="..dx)
-   elseif find(riders,a) then
-    rider=rider.."x+"..mx
-    a:movex(mx)
    end
+   sl.collides=true
   end
-  sl.collides=true
 
   local my=sl:movey(sl.vy, function()
    bounce=true
+--   sl.vy*=-1
   end)
-  sl.collides=false
-  for a in all(actors) do
-   if a:overlap_spr(a.x,a.y,sl) then
-    local dy=0
-    if my>0 then
-     dy = (sl.y+sl.h)-a.y+1
-     a.c=14
-    else
-     dy = sl.y-(a.y+a.h)-1
-     a.c=12
+--  assert(my==0 or my==-1 or my==1)
+  if my~=0 then
+   sl.collides=false
+   for a in all(actors) do
+    if a:overlap_spr(a.x,a.y,sl) then
+     while (
+      not a.squished and
+      a:overlap_spr(a.x,a.y,sl)
+     ) do
+      a:movey(sgn(my), function()
+       a:squish()
+      end)
+     end
+    elseif find(riders,a) then
+     rider=rider.." y+"..my
+     a:movey(my)
     end
-    a:movey(dy, function()
-     a:squish()
-    end)
-    print("dy="..dy)
-   elseif find(riders,a) then
-    rider=rider.." y+"..my
-    a:movey(my)
    end
+   sl.collides=true
   end
+
   if bounce then
    sl.vx*=-1
    sl.vy*=-1
   end
-  sl.collides=true
 
-  sl:draw()
   if sl==sliders[1] then
+  color(7)
   print("x="..sl.x)
   print("y="..sl.y)
   print("mx="..mx)
   print("my="..my)
+  print("r="..rider.."#"..#riders)
   end
 --  print("riders="..#riders,sl.x,sl.y+8)
-  print("r="..rider.."#"..#riders,sl.x,sl.y+8)
+--  print("r="..rider.."#"..#riders,sl.x,sl.y+8)
  end
  
 end
@@ -169,8 +191,9 @@ function sprite.__index(t,k)
  return sprite[k]
 end
 
-function sprite.new(tile)
+function sprite.new(name, tile)
  local s={
+  name=name,
  	t=tile,
  	c=nil, -- color
  	-- pos, size, vel, rem, offset
@@ -179,7 +202,8 @@ function sprite.new(tile)
   spd=1, -- speed
   collides_actors=true,
   collides_solids=true,
-  collides_map=true,
+  collides_map=f_solid,
+  collides_exclude=false,
   collides=true
  }
  setmetatable(s,sprite)
@@ -206,7 +230,7 @@ function sprite.draw(self)
  end
 end
 
-function sprite:movex(dx,cb)
+function sprite:movex(dx,cb,flag)
  if (dx==0) return 0
  local step=sgn(dx)
  self.rx+=dx
@@ -214,7 +238,7 @@ function sprite:movex(dx,cb)
  local moved=0
  self.rx-=move
  while move!=0 do
-  if self:overlap(self.x+step,self.y) then
+  if self:overlap(self.x+step,self.y,flag) then
    if (cb) cb()
    break
   end
@@ -225,7 +249,7 @@ function sprite:movex(dx,cb)
  return moved
 end
 
-function sprite:movey(dy,cb)
+function sprite:movey(dy,cb,flag)
  if (dy==0) return 0
  local step=sgn(dy)
  self.ry+=dy
@@ -233,7 +257,7 @@ function sprite:movey(dy,cb)
  local moved=0
  self.ry-=move
  while move!=0 do
-  if self:overlap(self.x,self.y+step) then
+  if self:overlap(self.x,self.y+step,flag) then
    if (cb) cb()
    break
   end
@@ -250,7 +274,7 @@ function sprite:accel(ax,ay)
  self.vy+=ay*dt
 end
 
-function sprite:overlap(x,y)
+function sprite:overlap(x,y,flag)
  if (not self.collides) return
  if self.collides_actors then
   for a in all(actors) do
@@ -268,7 +292,10 @@ function sprite:overlap(x,y)
  end
  if self.collides_map then
   -- check the corners vs map
-  return map_overlap(f_solid,x,y,self.w,self.h)
+  return map_overlap(
+   self.collides_map,
+   x,y,self.w,self.h,
+   self.collides_map_exclude)
  end
  return false
 end
@@ -295,7 +322,8 @@ function sprite:riders()
 end
 
 function sprite:squish()
- self.c=11
+ self.c=8
+ self.squished=true
 end
 
 -->8
@@ -308,6 +336,7 @@ f_slider=4
 f_track=8
 
 function init_map()
+ local si=1
  for x=0,15 do
   for y=0,15 do
    local t=mget(x,y)
@@ -329,13 +358,16 @@ function init_map()
    end
    -- sliders
    if f==f_slider then
-    local sl=sprite.new(t)
+    local sl=sprite.new("sl"..si,t)
+    si+=1
     sl.x=x*8
     sl.y=y*8
-    sl.vx=t==32 and 1/8 or 0
-    sl.vy=t==48 and 1/8 or 0
+    sl.vx=t==32 and 1/4 or 0
+    sl.vy=t==48 and 1/4 or 0
     sl.collides_actors=false
     sl.collides_solids=false
+    sl.collides_map=f_track
+    sl.collides_map_exclude=true
     add(sliders,sl)
     add(solids,sl)
     mset(x,y,t+1)
@@ -344,7 +376,7 @@ function init_map()
  end
 end
 
-function map_overlap(flag,x,y,w,h)
+function map_overlap(flag,x,y,w,h,exclude)
  -- each tile is 8 pixels
  local x,y,w,h=x/8,y/8,w/8,h/8
  -- loop across each tile x,y
@@ -354,7 +386,13 @@ function map_overlap(flag,x,y,w,h)
    -- what tile is there?
    local t=mget(tx,ty)
    -- does it match the flag?
-   if (fget(t)==flag) return true
+   local f=fget(t)
+   if (
+    (exclude and f~=flag) or
+    (not exclude and f==flag)
+   ) then
+    return true
+   end
   end
  end
  -- no overlap
@@ -564,10 +602,10 @@ __map__
 1000003100000100000200000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1000003131000000000000000031001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1000003131000000000000000031001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-1000003031000000100000000031001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+1000003030000000100000000031001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1000003131000000000000000031001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1000000000000000000000000030001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-1000102121202121212121211031001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+1000102121202021212121211031001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1000100000000000000000100031001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1000000000100000001010100031001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1000000000000000000000000031001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
