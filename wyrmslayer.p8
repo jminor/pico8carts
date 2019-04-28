@@ -6,7 +6,6 @@ __lua__
 -- todo:
 -- flapping affect vx?
 -- wide moving platforms
--- diagonal moving platforms
 -- circular moving platforms
 -- make it fun
 -- graphics
@@ -42,6 +41,13 @@ function _init()
  end
  
  init_map()
+
+ -- make one diagonal platform 
+ local sl=sliders[1]
+ sl.collides_map=f_solid
+ sl.collides_map_exclude=false
+ sl.vx=1/2
+ sl.vy=1/2
 
 end
 
@@ -111,11 +117,11 @@ end
 function update_sliders()
  for sl in all(sliders) do
   local riders=sl:riders()
-  local bounce=false
+  local bouncex,bouncey=false,false
   local rider=""
 
   local mx=sl:movex(sl.vx, function()
-   bounce=true
+   bouncex=true
   end)
 --  assert(mx==0 or mx==1 or mx==-1)
   if mx~=0 then
@@ -139,8 +145,7 @@ function update_sliders()
   end
 
   local my=sl:movey(sl.vy, function()
-   bounce=true
---   sl.vy*=-1
+   bouncey=true
   end)
 --  assert(my==0 or my==-1 or my==1)
   if my~=0 then
@@ -163,10 +168,8 @@ function update_sliders()
    sl.collides=true
   end
 
-  if bounce then
-   sl.vx*=-1
-   sl.vy*=-1
-  end
+  if (bouncex) sl.vx*=-1
+  if (bouncey) sl.vy*=-1
 
   if sl==sliders[1] then
   color(7)
