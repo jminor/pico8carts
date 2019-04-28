@@ -94,24 +94,50 @@ function _update60()
  for sl in all(sliders) do
   local riders=sl:riders()
   local bounce=false
-  local rider=0
+  local rider=""
   local mx=sl:movex(sl.vx, function()
    bounce=true
   end)
+  sl.collides=false
+  for a in all(actors) do
+   if a:overlap_spr(a.x,a.y,sl) then
+    local dx=0
+    if mx>0 then
+     dx = (sl.x+sl.w)-a.x+1
+    else
+     dx = sl.x-(a.x+a.w)-1
+    end
+    a:movex(dx, function()
+     a:squish()
+    end)
+    print("dx="..dx)
+   elseif find(riders,a) then
+    rider=rider.."x+"..mx
+    a:movex(mx)
+   end
+  end
+  sl.collides=true
+
   local my=sl:movey(sl.vy, function()
    bounce=true
   end)
   sl.collides=false
   for a in all(actors) do
    if a:overlap_spr(a.x,a.y,sl) then
-    local dx=mx>0 and sl.x+sl.w-a.x or sl.x-a.x-a.w
-    local dy=my>0 and sl.y+sl.h-a.y or sl.y-a.y-a.h
-    a:movex(dx, a.squish)
-    a:movey(dy, a.squish)
-   end --else
-   if find(riders,a) then
-    rider=mx
-    a:movex(mx)
+    local dy=0
+    if my>0 then
+     dy = (sl.y+sl.h)-a.y+1
+     a.c=14
+    else
+     dy = sl.y-(a.y+a.h)-1
+     a.c=12
+    end
+    a:movey(dy, function()
+     a:squish()
+    end)
+    print("dy="..dy)
+   elseif find(riders,a) then
+    rider=rider.." y+"..my
     a:movey(my)
    end
   end
@@ -120,14 +146,13 @@ function _update60()
    sl.vy*=-1
   end
   sl.collides=true
+
   sl:draw()
   if sl==sliders[1] then
   print("x="..sl.x)
   print("y="..sl.y)
   print("mx="..mx)
   print("my="..my)
-  print("vx="..sl.vx)
-  print("vy="..sl.vy)
   end
 --  print("riders="..#riders,sl.x,sl.y+8)
   print("r="..rider.."#"..#riders,sl.x,sl.y+8)
@@ -182,39 +207,39 @@ function sprite.draw(self)
 end
 
 function sprite:movex(dx,cb)
+ if (dx==0) return 0
  local step=sgn(dx)
  self.rx+=dx
  local move=int(self.rx)
  local moved=0
  self.rx-=move
  while move!=0 do
-  if not self:overlap(self.x+step,self.y) then
-   self.x+=step
-  else
-   if cb~=nil then cb() end
+  if self:overlap(self.x+step,self.y) then
+   if (cb) cb()
    break
   end
-  move-=step
+  self.x+=step
   moved+=step
+  move-=step
  end
  return moved
 end
 
 function sprite:movey(dy,cb)
+ if (dy==0) return 0
  local step=sgn(dy)
  self.ry+=dy
  local move=int(self.ry)
  local moved=0
  self.ry-=move
  while move!=0 do
-  if not self:overlap(self.x,self.y+step) then
-   self.y+=step
-  else
-   if cb~=nil then cb() end
+  if self:overlap(self.x,self.y+step) then
+   if (cb) cb()
    break
   end
-  move-=step
+  self.y+=step
   moved+=step
+  move-=step
  end
  return moved
 end
@@ -269,6 +294,10 @@ function sprite:riders()
  return t
 end
 
+function sprite:squish()
+ self.c=11
+end
+
 -->8
 -- map stuff
 
@@ -303,8 +332,8 @@ function init_map()
     local sl=sprite.new(t)
     sl.x=x*8
     sl.y=y*8
-    sl.vx=t==32 and 1 or 0
-    sl.vy=t==48 and 1 or 0
+    sl.vx=t==32 and 1/8 or 0
+    sl.vy=t==48 and 1/8 or 0
     sl.collides_actors=false
     sl.collides_solids=false
     add(sliders,sl)
