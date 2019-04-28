@@ -1,6 +1,8 @@
 pico-8 cartridge // http://www.pico-8.com
 version 17
 __lua__
+-- main
+
 -- todo:
 -- jumping inconsistent
 -- flapping broken - btnp?
@@ -16,40 +18,29 @@ dirs={
  {x=0,y=-20}
 }
 
+gravity=1
+
 function _init()
- pls={}
+ actors={}
+ solids={}
+ players={}
+
  for i=1,3 do
-  local pl={
-  	t=i,
-   x=0,y=0,
-   vx=0,vy=0,
-   mx=0,my=0,
-   spd=1+0.1*i,
-   w=8,h=8
-  }
-  add(pls,pl)
+  local pl=sprite.new(i)
+  pl.spd+=0.1*i
+  pl.w=i*2
+  pl.h=i*5
+  pl.ox=-pl.w/2
+  pl.oy=0
+  add(actors,pl)
+  add(players,pl)
  end
- for x=0,15 do
-  for y=0,15 do
-   local t=mget(x,y)
-   if fget(t)==1 then
-    pls[1].x=x
-    pls[1].y=y
-    mset(x,y,0)
-   end
-   if fget(t)==2 then
-    if rnd()<0.5 then
-     mset(x,y,t+1)
-    end
-   end
-  end
- end
- for pl in all(pls) do
-  pl.x=pls[1].x
-  pl.y=pls[1].y
- end
- pls[2].canfly=true
+ players[2].canfly=true
+
+ init_map()
+
 end
+
 
 function _update60()
  cls()
@@ -62,7 +53,7 @@ function _update60()
    cy+=z.y
   end
  end
- for p in all(pls) do
+ for p in all(players) do
   p.cx=cx
   p.cy=cy
   if p.canfly then
@@ -71,70 +62,145 @@ function _update60()
    end
    p.vx*=0.9
   else
-   if stand(p) then
+   if p:standing() then
     p.vx*=0.8
    else
     p.vx*=0.9
     p.cy=0
    end
   end
-  accel(p,p.cx*p.spd,p.cy*p.spd)
-  move(p,p.vx,p.vy)
-  draw_spr(p)
+  p:accel(
+   p.cx*p.spd,
+   p.cy*p.spd + gravity
+  )
+  p:move(p.vx,p.vy)
+  p:draw()
  end
 end
 
-function draw_spr(s)
- --rect(s.x,s.y,s.x+s.w,s.y+s.h)
- spr(s.t,s.x,s.y)
+
+-->8
+-- sprite stuff
+sprite = {}
+
+-- bare bones oop
+function sprite.__index(t,k)
+ return sprite[k]
 end
 
-function accel(s,ax,ay)
- local dt=0.1
- local gravity=0.1
- s.vx+=ax*dt
- s.vy+=ay*dt+gravity
+function sprite.new(tile)
+ local s={
+ 	t=tile,
+ 	-- pos, size, vel, move, offset
+  x=0, w=8, vx=0, mx=0, ox=0,
+  y=0, h=8, vy=0, my=0, oy=0,
+  spd=1
+ }
+ setmetatable(s,sprite)
+ return s
 end
 
-function move(s,dx,dy)
- s.mx+=dx
- local rem=flr(s.mx)
- s.mx-=rem
+function sprite.draw(self)
+ spr(
+  self.t,
+  self.x + self.ox,
+  self.y + self.oy
+ )
+ -- border
+ rect(
+  self.x,
+  self.y,
+  self.x+self.w-1,
+  self.y+self.h-1
+ )
+end
+
+function sprite:move(dx,dy)
+ self.mx+=dx
+ local rem=flr(self.mx)
+ self.mx-=rem
  local step=sgn(dx)
  for sx=1,abs(rem) do
-  if not hit(s.x+step,s.y) then
-   s.x+=step
+  if not self:overlap(self.x+step,self.y) then
+   self.x+=step
   else
-   s.vx=0
+   self.vx=0
    break
   end
  end
  
- s.my+=dy
- local rem=flr(s.my)
- s.my-=rem
+ self.my+=dy
+ local rem=flr(self.my)
+ self.my-=rem
  local step=sgn(dy)
  for sy=1,abs(rem) do
-  if not hit(s.x,s.y+step) then
-   s.y+=step
+  if not self:overlap(self.x,self.y+step) then
+   self.y+=step
   else
-   s.vy=0
+   self.vy=0
    break
   end
  end
 end
 
-function hit(x,y)
- x=x/8
- y=y/8
- return mget(flr(x),flr(y))!=0 or
-        mget(ceil(x),flr(y))!=0 or
-        mget(flr(x),ceil(y))!=0 or
-        mget(ceil(x),ceil(y))!=0
+function sprite:accel(ax,ay)
+ local dt=0.1
+ self.vx+=ax*dt
+ self.vy+=ay*dt
 end
 
-function stand(s)
- return hit(s.x,s.y+1)
+function sprite:overlap(x,y)
+ -- check the corners vs map
+ return map_overlap(f_solid,x,y,self.w,self.h)
+end
+
+function sprite:standing()
+ return self:overlap(self.x,self.y+1)
+end
+
+-->8
+-- map stuff
+
+-- flags
+f_player=1
+f_solid=2
+
+function init_map()
+ for x=0,15 do
+  for y=0,15 do
+   local t=mget(x,y)
+   -- player
+   if fget(t)==f_player then
+    players[t].x=x*8
+    players[t].y=y*8
+    mset(x,y,0)
+   end
+   -- solid
+   if fget(t)==f_solid then
+    -- randomize gfx
+    if rnd()<0.5 then
+     mset(x,y,t+1)
+    end
+   end
+  end
+ end
+end
+
+function map_overlap(flag,x,y,w,h)
+ -- each tile is 8 pixels
+ local x,y,w,h=x/8,y/8,w/8,h/8
+ -- loop across each tile x,y
+ -- that the rect covers
+ for tx=flr(x),ceil(x+w-1) do
+  for ty=flr(y),ceil(y+h-1) do
+   -- what tile is there?
+   local t=mget(tx,ty)
+   -- does it match the flag?
+   if (fget(t)==flag) return true
+  end
+ end
+ -- no overlap
+ return false
 end
 
 __gfx__
@@ -290,8 +356,8 @@ __gff__
 __map__
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000100000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1000000000000000100000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
