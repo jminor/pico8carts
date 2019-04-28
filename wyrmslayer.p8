@@ -15,7 +15,6 @@ dirs={
  {x= 1,y=0},
  {x=0,y=-1},
  {x=0,y= 1},
- {x=0,y=-20}
 }
 
 gravity=1
@@ -45,35 +44,39 @@ end
 function _update60()
  cls()
  map()
- local cx,cy=0,0
- for d=1,5 do
-  if btn(d-1) then
-   local z=dirs[d]
-   cx+=z.x
-   cy+=z.y
-  end
- end
+ -- controls
+ local cx,cy,cj=0,0,false
+ if (btn(0)) cx-=1
+ if (btn(1)) cx+=1
+ if (btn(2)) cy-=1
+ if (btn(3)) cy+=1
+ if (btnp(4)) cj=true
  for p in all(players) do
   p.cx=cx
-  p.cy=cy
   if p.canfly then
-   if not btnp(4) then
-    p.cy=0
-   end
+   p.cy=cj and -20 or 0
    p.vx*=0.9
+   -- limit vy
+   p.vy=mid(p.vy,2,-2)
   else
    if p:standing() then
+    p.cy=cj and -20 or 0
     p.vx*=0.8
    else
-    p.vx*=0.9
     p.cy=0
+    p.vx*=0.9
    end
   end
   p:accel(
    p.cx*p.spd,
    p.cy*p.spd + gravity
   )
-  p:move(p.vx,p.vy)
+  p:movex(p.vx, function()
+   p.vx=0
+  end)
+  p:movey(p.vy, function()
+   p.vy=0
+  end)
   p:draw()
  end
 end
@@ -91,9 +94,9 @@ end
 function sprite.new(tile)
  local s={
  	t=tile,
- 	-- pos, size, vel, move, offset
-  x=0, w=8, vx=0, mx=0, ox=0,
-  y=0, h=8, vy=0, my=0, oy=0,
+ 	-- pos, size, vel, rem, offset
+  x=0, w=8, vx=0, rx=0, ox=0,
+  y=0, h=8, vy=0, ry=0, oy=0,
   spd=1
  }
  setmetatable(s,sprite)
@@ -115,31 +118,44 @@ function sprite.draw(self)
  )
 end
 
-function sprite:move(dx,dy)
- self.mx+=dx
- local rem=flr(self.mx)
- self.mx-=rem
+function int(v)
+ return v>=0 and flr(v) or -(flr(-v))
+end
+
+assert(int(0.7)==0)
+assert(int(-0.7)==0)
+assert(int(1.7)==1)
+assert(int(-1.7)==-1)
+
+function sprite:movex(dx,cb)
  local step=sgn(dx)
- for sx=1,abs(rem) do
+ self.rx+=dx
+ local move=int(self.rx)
+ self.rx-=move
+ while move!=0 do
   if not self:overlap(self.x+step,self.y) then
    self.x+=step
   else
-   self.vx=0
+   if cb~=nil then cb() end
    break
   end
+  move-=step
  end
- 
- self.my+=dy
- local rem=flr(self.my)
- self.my-=rem
+end
+
+function sprite:movey(dy,cb)
  local step=sgn(dy)
- for sy=1,abs(rem) do
+ self.ry+=dy
+ local move=int(self.ry)
+ self.ry-=move
+ while move!=0 do
   if not self:overlap(self.x,self.y+step) then
    self.y+=step
   else
-   self.vy=0
+   if cb~=nil then cb() end
    break
   end
+  move-=step
  end
 end
 
@@ -150,8 +166,20 @@ function sprite:accel(ax,ay)
 end
 
 function sprite:overlap(x,y)
+ for a in all(actors) do
+  if a~=self and self:overlap_spr(x,y,a) then
+   return true
+  end
+ end
  -- check the corners vs map
  return map_overlap(f_solid,x,y,self.w,self.h)
+end
+
+function sprite:overlap_spr(x,y,a)
+ return (x < a.x+a.w) and
+  (y < a.y+a.h) and
+  (x+self.w > a.x) and
+  (y+self.h > a.y)
 end
 
 function sprite:standing()
