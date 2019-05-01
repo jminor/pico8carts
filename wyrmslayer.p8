@@ -5,7 +5,6 @@ __lua__
 
 -- todo:
 -- flapping affect vx?
--- wide moving platforms
 -- circular moving platforms
 -- make it fun
 -- graphics
@@ -20,6 +19,7 @@ dirs={
 gravity=1
 
 function _init()
+ sprites={}
  actors={}
  solids={}
  players={}
@@ -37,8 +37,14 @@ function _init()
   add(actors,pl)
   add(players,pl)
  end
- if players[1] then
-	 players[1].canfly=true
+ pl=players[1]
+ if pl then
+	 pl.canfly=true
+  pl.poof=sprite.new("poof",134)
+  pl.poof.enabled=false
+  pl.poof.timer=0
+  pl.poof.collides=false
+  add(actors,pl.poof)
  end
  
  mapx,mapy=2,0
@@ -53,145 +59,169 @@ function _init()
 
 end
 
-
+holdjump=0
 function _update60()
  cls()
 -- map(mapx*16,mapy*16)
  camera(mapx*128,mapy*128)
  map()
  -- controls
- local cx,cy,cj,hj=0,0,false,false
+ local cx,cy=0,0
  if (btn(0)) cx-=1
  if (btn(1)) cx+=1
 -- if (btn(2)) cy-=1
 -- if (btn(3)) cy+=1
- if (btnp(2) or btnp(4)) cj=true
- if (btn(2) or btn(4)) hj=true
+ local jb=btn(2) or btn(4)
+ local cj=jb and holdjump==0
+ -- holdjump is global
+ holdjump=jb and holdjump+1 or 0
 
  update_sliders()
- update_players(cx,cy,cj,hj)
+ update_players(cx,cy,cj,holdjump)
  
- for p in all(players) do
-  p:draw()
- end
- for sl in all(sliders) do
-  sl:draw()
+ for s in all(sprites) do
+  s:draw()
  end
 end
 
 function update_players(cx,cy,cj,hj)
  local walk_ts={132,133}
  for p in all(players) do
-  p.cx=cx
-  if cx!=0 then p.face=cx end
-  if p.canfly then
-   if p:standing() then
-    p.t=walk_ts[flr(p.x/2)%2+1]
-   else
-    p.t=btn(4) and 131 or 130
-   end
-   p.cy=cj and -20 or 0
-   p.vx*=0.9
-   -- limit vy
-   p.vy=mid(p.vy,1,-1)
-  else
-   -- can we jump?
-   -- going up => not standing
-   if p.vy>=0 and p:standing() then
-    -- vy=0 is key to a
-    -- consistent jump
-    p.vy=0
+  if p.enabled then
+   p.cx=cx
+   if cx~=0 then p.face=cx end
+   if p.canfly then
+    if p:standing() then
+     local ti=flr(p.x/2)%2+1
+     ti=p.cx~=0 and ti or 1
+     p.t=walk_ts[ti]
+    else
+     p.t=(hj>0) and 131 or 130
+    end
     p.cy=cj and -20 or 0
-    p.vx*=0.8
-   -- wall jump
-   elseif cj and p.cx~=0 and p:standing(cx,0) then
-    p.vy=0
-    p.cy=cj and -20 or 0
-    p.vx=0
-    p.cx*=-20
-   else
-    p.cy=0
     p.vx*=0.9
+    -- limit vy
+    p.vy=mid(p.vy,(hj>0 and hj<30) and 0.5 or 2,-1)
+    if cj then
+     p.poof.enabled=true
+     p.poof.x=p.x
+     p.poof.y=p.y
+     p.poof.vy=1
+     p.poof.t=134
+     p.poof.face=p.face
+     p.poof.timer=5
+    elseif p.poof.enabled then
+     p.poof.timer-=1
+     p.poof.y+=1/2
+     --p.poof.t+=1
+     if p.poof.timer<=0 then
+      p.poof.enabled=false
+     end
+    end
+   else
+    -- can we jump?
+    -- going up => not standing
+    if p.vy>=0 and p:standing() then
+     -- vy=0 is key to a
+     -- consistent jump
+     p.vy=0
+     p.cy=cj and -20 or 0
+     p.vx*=0.8
+    -- wall jump
+    elseif cj and p.cx~=0 and p:standing(cx,0) then
+     p.vy=0
+     p.cy=cj and -20 or 0
+     p.vx=0
+     p.cx*=-20
+    else
+     p.cy=0
+     p.vx*=0.9
+    end
+    if p.vy<0 and hj==0 then
+     p.vy*=0.25
+    end
    end
-   if p.vy<0 and not hj then
-    p.vy*=0.25
-   end
-  end
-  p:accel(
-   p.cx*p.spd,
-   p.cy*p.spd + gravity
-  )
-  p:movex(p.vx, function()
-   p.vx=0
-  end)
-  p:movey(p.vy, function()
-   p.vy=0
-  end)
+   p:accel(
+    p.cx*p.spd,
+    p.cy*p.spd + gravity
+   )
+   p:movex(p.vx, function()
+    p.vx=0
+   end)
+   p:movey(p.vy, function()
+    p.vy=0
+   end)
 --  print("x="..p.x,p.c)
 --  print("y="..p.y)
 --  print("cx="..p.cx)
 --  print("cy="..p.cy)
 --  print("vx="..p.vx)
 --  print("vy="..p.vy)
+  end
  end
 end
 
 function update_sliders()
  for sl in all(sliders) do
-  local riders=sl:riders()
-  local bouncex,bouncey=false,false
-  local rider=""
+  if sl.enabled then
+   local riders=sl:riders()
+   local bouncex,bouncey=false,false
+   local rider=""
 
-  local mx=sl:movex(sl.vx, function()
-   bouncex=true
-  end)
+   local mx=sl:movex(sl.vx, function()
+    bouncex=true
+   end)
 --  assert(mx==0 or mx==1 or mx==-1)
-  if mx~=0 then
-   sl.collides=false
-   for a in all(actors) do
-    if a:overlap_spr(a.x,a.y,sl) then
-     while (
-      not a.squished and
-      a:overlap_spr(a.x,a.y,sl)
-     ) do
-      a:movex(sgn(mx), function()
-       a:squish()
-      end)
+   if mx~=0 then
+    sl.collides=false
+    for a in all(actors) do
+     if a:overlap_spr(a.x,a.y,sl) then
+      while (
+       a.enabled and
+       a.collides and
+       not a.squished and
+       a:overlap_spr(a.x,a.y,sl)
+      ) do
+       a:movex(sgn(mx), function()
+        a:squish()
+       end)
+      end
+     elseif find(riders,a) then
+      rider=rider.."x+"..mx
+      a:movex(mx)
      end
-    elseif find(riders,a) then
-     rider=rider.."x+"..mx
-     a:movex(mx)
     end
+    sl.collides=true
    end
-   sl.collides=true
-  end
 
-  local my=sl:movey(sl.vy, function()
-   bouncey=true
-  end)
+   local my=sl:movey(sl.vy, function()
+    bouncey=true
+   end)
 --  assert(my==0 or my==-1 or my==1)
-  if my~=0 then
-   sl.collides=false
-   for a in all(actors) do
-    if a:overlap_spr(a.x,a.y,sl) then
-     while (
-      not a.squished and
-      a:overlap_spr(a.x,a.y,sl)
-     ) do
-      a:movey(sgn(my), function()
-       a:squish()
-      end)
+   if my~=0 then
+    sl.collides=false
+    for a in all(actors) do
+     if a:overlap_spr(a.x,a.y,sl) then
+      while (
+       a.enabled and
+       a.collides and
+       not a.squished and
+       a:overlap_spr(a.x,a.y,sl)
+      ) do
+       a:movey(sgn(my), function()
+        a:squish()
+       end)
+      end
+     elseif find(riders,a) then
+      rider=rider.." y+"..my
+      a:movey(my)
      end
-    elseif find(riders,a) then
-     rider=rider.." y+"..my
-     a:movey(my)
     end
+    sl.collides=true
    end
-   sl.collides=true
-  end
 
-  if (bouncex) sl.vx*=-1
-  if (bouncey) sl.vy*=-1
+   if (bouncex) sl.vx*=-1
+   if (bouncey) sl.vy*=-1
 
 --  if sl==sliders[1] then
 --  color(7)
@@ -201,6 +231,7 @@ function update_sliders()
 --  print("my="..my)
 --  print("r="..rider.."#"..#riders)
 --  end
+  end
  end
  
 end
@@ -233,11 +264,13 @@ function sprite.new(name,tile)
   collides=true
  }
  setmetatable(s,sprite)
+ add(sprites,s)
  return s
 end
 
 function sprite.draw(self)
  if not self.enabled then return end
+ if (self.clearp~=nil) pal(self.clearp,0)
  if self.t~=nil or self.ts~=nil then
   if self.w>8 or self.h>8 then
    local ti=0
@@ -271,10 +304,11 @@ function sprite.draw(self)
    self.c
   )
  end
+ pal()
 end
 
 function sprite:movex(dx,cb,flag)
- if not self.enabled then return end
+ --if not self.enabled then return end
  if (dx==0) return 0
  local step=sgn(dx)
  self.rx+=dx
@@ -294,7 +328,7 @@ function sprite:movex(dx,cb,flag)
 end
 
 function sprite:movey(dy,cb,flag)
- if not self.enabled then return end
+ --if not self.enabled then return end
  if (dy==0) return 0
  local step=sgn(dy)
  self.ry+=dy
@@ -419,6 +453,7 @@ function init_map()
     sl.collides_solids=false
 --    sl.collides_map=f_track
 --    sl.collides_map_exclude=true
+				sl.clearp=14
     add(sliders,sl)
     add(solids,sl)
     -- which way should it move?
@@ -570,9 +605,9 @@ dddddddd000010000000000000000000000000000000000000000000000000000000000000000000
 0000000007721417b338d0000008d0000008d0000008d000000000000000000000000000000c000000000c00c77cc7c00c7c0cc0000a3a80000a3a8000070000
 007007000028f4f00338777700887777008877770088777700000000000000000000000000ccc000000c0000c7cc77c00cc0c7c0000070300000703000868000
 0007700000f888800b33344000833440008334400083344000000000000000000000000000c7cc0000ccc000ccc77cc0000c77c0000008300000083000606000
-000770000ff4888f003334aa303333aa033334aa033334aa00000000000000000000000000c77c0000c7cc00cc77ccc0ccc0c7c0033bbbb0033bbbb000000000
-007007000ff4444f3333455a3333353ab3b3455ab3b3455a0000000000000000002442000024420000244200c77cc7c0c77c0cc0030b33b0030b33b000000000
-0000000009944229354455000543535305445500054455000000000000000000000220000002200000022000cccccc000cccc000000033b0000033b000000000
+000770000ff4888f003334aa303333aa033334aa033334aa00505000000000000000000000c77c0000c7cc00cc77ccc0ccc0c7c0033bbbb0033bbbb000000000
+007007000ff4444f3333451a3333353ab3b3451ab3b3451a0605060006000600002442000024420000244200c77cc7c0c77c0cc0030b33b0030b33b000000000
+0000000009944229354455000543535305445500054455000006000000060000000220000002200000022000cccccc000cccc000000033b0000033b000000000
 0000000000040020000000400000b0b0004040000400040000000000000000000002200000022000000220000000000000000000000300b00000300b00000000
 0dd1ddd1ddd1ddd1ddd1ddd000000000000000000400004000000000000000000000000004050405040504050000000000000000000000000000000000000000
 1dd111111dd111111dd1111100000000000000000424442000000000000000000000000044050505000000000011000000000000000000000000000000000000
@@ -591,13 +626,13 @@ dd100000000940000000101d000000001100000000d00000007007000d1111000922220006600700
 d1101100000000000000101d0000000000000000000000000606607000000000000000000066707007000700000000000011101ddd0440dddd0440ddd1111000
 11000000000000000000001100000000000000000000000060060006000000000000000000006600060706060000000000000000000020000000200000000000
 d1011100000000000000001100000000000000000000000000000000000000000000000000000000999899987777777700011111011000110111100011111111
-d1011000001100000011011d00000000000880000000000000000000000dd000000000000007b000899888887777077000001111011111110111000001111110
-1100000100000110000001dd00079900007788000077770000ccc10000666600007779000077bb00888800000770000000001111011111110111000000001100
-d110110001101110011001dd007449900077820007ffffe00c777c100d6776d0007998000777bbb0000002200000011000000000000000000000000000101100
-dd100000011000000110011d009499400088820007ffffe000ccc1000d6766d0007998000bbb3330022202200111011000000001111110111000000000101100
-dd1011110000111100001111009997400088720000eeee00000c1000006666000098880000bb3300022000000110000000000000011110100000000000101000
-11111dd111111dd111111dd100094400000220000000000000000000000dd00000000000000b3000000022000000110000000000000000000000000000001100
-01dd1ddd1ddd1ddd1ddd1dd000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100
+d1011000001100000011011d00000000000880000000000000000000000dd000000000000007b000899888887777e77e00001111011111110111000001111110
+1100000100000110000001dd00079900007788000077770000ccc10000666600007779000077bb008888eeeee77eeeee00001111011111110111000000001100
+d110110001101110011001dd007449900077820007ffffe00c777c100d6776d0007998000777bbb0eeeee22eeeeee11e00000000000000000000000000101100
+dd100000011000000110011d009499400088820007ffffe000ccc1000d6766d0007998000bbb3330e222e22ee111e11e00000001111110111000000000101100
+dd1011110000111100001111009997400088720000eeee00000c1000006666000098880000bb3300e22eeeeee11eeeee00000000011110100000000000101000
+11111dd111111dd111111dd100094400000220000000000000000000000dd00000000000000b3000eeee22e0eeee11e000000000000000000000000000001100
+01dd1ddd1ddd1ddd1ddd1dd000000000000000000000000000000000000000000000000000000000000eeee0000eeee000000000000000000000000000000100
 __label__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
