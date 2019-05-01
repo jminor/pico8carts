@@ -89,6 +89,7 @@ function update_players(cx,cy,cj,hj)
  for p in all(players) do
   if p.enabled then
    p.cx=cx
+   local glide=(hj>0 and hj<30)
    if cx~=0 then p.face=cx end
    if p.canfly then
     if p:standing() then
@@ -96,12 +97,12 @@ function update_players(cx,cy,cj,hj)
      ti=p.cx~=0 and ti or 1
      p.t=walk_ts[ti]
     else
-     p.t=(hj>0) and 131 or 130
+     p.t=glide and 131 or 130
     end
     p.cy=cj and -20 or 0
     p.vx*=0.9
     -- limit vy
-    p.vy=mid(p.vy,(hj>0 and hj<30) and 0.5 or 2,-1)
+    p.vy=mid(p.vy,glide and 0.5 or 2,-1)
     if cj then
      p.poof.enabled=true
      p.poof.x=p.x
