@@ -36,6 +36,7 @@ power_dirs={
  [54]={up}
 }
 power_offset=6
+power_speed=2
 
 function _init()
  debugs={}
@@ -253,7 +254,7 @@ function _update60()
    s.update(s)
   end
  end
- if clock%4==0 then
+ if clock%power_speed==0 then
   update_map()
  end
  update_lava(lava)
