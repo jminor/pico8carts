@@ -1,51 +1,30 @@
 pico-8 cartridge // http://www.pico-8.com
 version 18
 __lua__
--- chickens!!! v2.0
+-- chickens!!! v2.1
 -- by jminor
 -- music by bibiki
 -- now 60 fps!
 -- now 2 player co-op!
 
-sprites={}
-t_fence=0
-t_chicken=1
-t_player=2
-t_seeds=3
-t_gate=4
-chickens={}
-seeds={}
-gates={}
-fences={}
-players={}
-living={}
-obstacles={}
-shouted=false
-gated=false
-level=0
-
-function mksprite(x,y,vx,vy,v)
- return {
-  t=0,
-  x=x,
-  y=y,
-  vx=vx,
-  vy=vy,
-  fx=1,
-  tile=v,
-  ntiles=1,
-  hidden=false,
-  solid=true,
-  update=spr_update,
-  draw=spr_draw,
-  shadow=false,
-  say=spr_say,
-  speech=nil,
-  speechcount=0
- }
-end
-
 function _init()
+ t=0
+ sprites={}
+ t_fence=0
+ t_chicken=1
+ t_player=2
+ t_seeds=3
+ t_gate=4
+ chickens={}
+ seeds={}
+ gates={}
+ fences={}
+ players={}
+ living={}
+ obstacles={}
+ shouted=false
+ gated=false
+ level=0
  is_win=false
  coop_full=false
  gate_open=true
@@ -113,6 +92,27 @@ function _init()
  end
 end
 
+function mksprite(x,y,vx,vy,v)
+ return {
+  t=0,
+  x=x,
+  y=y,
+  vx=vx,
+  vy=vy,
+  fx=1,
+  tile=v,
+  ntiles=1,
+  hidden=false,
+  solid=true,
+  update=spr_update,
+  draw=spr_draw,
+  shadow=false,
+  say=spr_say,
+  speech=nil,
+  speechcount=0
+ }
+end
+
 function find_coop()
  f=fences[1]
  coop={x0=f.x,x1=f.x,y0=f.y,y1=f.y}
@@ -156,7 +156,6 @@ function all_in_zone(l,z)
  return true
 end
 
-t=0
 function _update60()
  t=t+1
  for s in all(sprites) do
@@ -167,10 +166,16 @@ function _update60()
 end
 
 function check_win()
- if not is_win then
+ if is_win then
+  if t>win_time+500 then
+   reload()
+   _init()
+  end
+ else
   coop_full = all_in_zone(chickens,coop)
   if coop_full and not gate_open then
    is_win=true
+   win_time=t
    music(-1)
    sfx(4)
 
