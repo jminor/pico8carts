@@ -316,7 +316,9 @@ function spr_draw(s)
   tile += (s.t/6)%(s.ntiles)
  end
  if s.shadow and (t%2)==0 then
+  pal(5,0)
   spr(0,s.x*8,s.y*8+4,1,1)
+  pal()
  end
  spr(tile,s.x*8,s.y*8,1,1,s.fx<0)
  if s.speechcount>0 then
