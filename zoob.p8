@@ -53,7 +53,7 @@ function _init()
  }
  lava={
   y=64,
-  vy=-0.01
+  vy=-0.021
  }
  dirty=nil
  for y=0,cam.maxy do
