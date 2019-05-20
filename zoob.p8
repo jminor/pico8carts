@@ -126,6 +126,11 @@ function update_player(p)
   if p.life<0 then
    for i=1,500 do
     pprint("game over",64,i)
+    if i>60 then
+     pprint("press ❎ or 🅾️",80,7)
+     pprint(" to try again",88,7)
+     if btn(❎) or btn(🅾️) then break end
+    end
     flip()
    end
    reload()
