@@ -385,14 +385,12 @@ function update_lava(lava)
 end
 
 function draw_lava(lava)
- local f=false
- local dx=rnd()*1-0.5
- local dy=rnd()*1-0.5
- local y=lava.y*8+dy
- if (flr(clock*0.15)%2==0) f=true
+ local f=((clock)%2==0)
+ local y=lava.y*8
  rectfill(0,y+4,16*8,128*8,8)
  for x=0,16 do
-  spr(97,x*8+dx,y,1,1,f)
+  local dy=sin(x*0.1+clock*0.02)
+  spr(97,x*8,y+dy,1,1,f)
  end
 end
 
