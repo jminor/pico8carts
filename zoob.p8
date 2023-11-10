@@ -1,5 +1,5 @@
 pico-8 cartridge // http://www.pico-8.com
-version 18
+version 41
 __lua__
 -- zoob
 -- by jminor
@@ -53,7 +53,8 @@ function _init()
  }
  lava={
   y=64,
-  vy=-0.021
+--too hard:  vy=-0.021
+  vy=-0.018
  }
  dirty=nil
  for y=0,cam.maxy do
