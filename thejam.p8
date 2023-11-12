@@ -1,5 +1,5 @@
 pico-8 cartridge // http://www.pico-8.com
-version 41
+version 18
 __lua__
 
 t=0
@@ -37,7 +37,7 @@ function wiggle(text,x,y,f,p,a,r,c)
  for rep=1,r do
   for i=1,#text do
    local wig=sin(z*f)*a
-   print(text[i],px,y+wig,c)
+   print(sub(text,i,i),px,y+wig,c)
    px+=4
    z+=p
   end
