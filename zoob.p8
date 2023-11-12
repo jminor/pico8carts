@@ -1,5 +1,5 @@
 pico-8 cartridge // http://www.pico-8.com
-version 41
+version 18
 __lua__
 -- zoob
 -- by jminor
