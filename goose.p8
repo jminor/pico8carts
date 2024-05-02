@@ -241,7 +241,7 @@ function _draw()
    cprint2("into the goal",64,15*8,7)
   else
    if shouted<3 then
-    xcprint2(63,"to shout",64,14*8,7)
+    xcprint2(63,"to yell",64,14*8,7)
    end
    if gated<3 then
     xcprint2(62,"to open/close the goal",64,15*8,7)
